@@ -1,0 +1,109 @@
+
+# coding: utf-8
+
+# # PHYS 641 Assignment 1 
+# ### Andrew V. Zwaniga 
+# #### Problem 5: Fitting a Gaussian template 
+# 
+# Here we show a program that generates random Gaussian noise on a finite interval and fits a one-parameter template Gaussian to different segments of the data. The single parameter to be fitted is the amplitude. 
+# 
+# Let $n_{d}$ be the number of entries in the data vector $\mathbf{d}$ and $n_{p}$ be the number of entries in the model vector $\mathbf{m}$. In this example, $n_{p} = 1$ so $\mathbf{m}=m$ is a scalar. $\mathbf{d}$ is $n_{d}\times1$ and the template matrix $A$ is $1\times n_{d}$. The noise matrix $N$ is $n_{d}\times n_{d}$. The least-squares maximum likelihood solution for $m$ is 
+# 
+# $\begin{equation} m = \frac{A^{\text{T}}N^{-1}\mathbf{d}}{A^{\text{T}}N^{-1}A}~~~~~~(1) \end{equation}$
+# 
+# The variance on $m$ is 
+# 
+# $ \begin{equation} \text{Var}[m] = (\frac{A^{\text{T}}N^{-1}}{A^{\text{T}}N^{-1}A})^{2}\text{Var}[\mathbf{d}] \end{equation}$ 
+# 
+
+# In[69]:
+
+
+import numpy 
+from matplotlib import pyplot as plt
+
+## Define the data window 
+
+k = 0
+k_max = 100
+
+amps = numpy.zeros(k_max)
+errs = numpy.zeros(k_max)
+
+while k < k_max: 
+    lower_bound = -5  # lower bound of data window 
+    upper_bound = 5   # upper bound of data window 
+    dx          = 0.01  # discretization of interval into bins of width 'delta'
+    x           = numpy.arange(lower_bound, upper_bound, dx) # construct the x-axis 
+    measure     = len(x) # length of the data window 
+
+    ## Noise 
+
+    noise = 0.5
+    N_inv = 1/noise**2 # stationary noise: N_inv is the same for all data points 
+
+    ## Define the injected function
+
+    mu         = 0
+    sigma      = 0.3
+    amp_truth  = 2.0 # the true amplitude - code will attempt to fit this in a background of noise
+    template   = numpy.exp(-0.5*(x-mu)**2/sigma**2) 
+
+    ## Define the simulated data 
+
+    # The data is a vector of length equal to to the interval's measure 
+    # Note: numpy.random.randn(X) creates an array of shape [X_1, ..., X_n] 
+    #       with each X_i being pulled from a standard normal distribution 
+
+    data = amp_truth*template + numpy.random.randn(measure)*noise 
+
+    ## Extraction of the injected function
+
+    S2Nratio    = numpy.zeros(measure) # initialize with zeroes; signal-to-noise ratio
+    A_LLS       = numpy.zeros(measure) # initialize with zeroes; this will be a vector of m's from equation (1) 
+                                # at various positions in the data window  
+    
+    N_inv_d          = N_inv*data  # this is N^{-1}*d 
+    A_T_N_inv_A      = numpy.dot(template, N_inv*template) # this is A^{T}*N^{-1}*A
+    sqrt_A_T_N_inv_A = numpy.sqrt(A_T_N_inv_A)
+    # Calculate the LLS maximum-likelihood amplitude at each location in the data window 
+
+    for i in range(measure):
+        template     = numpy.exp(-0.5*(x-x[i])**2/sigma**2) # for each i this is a scalar, so we get a vector 
+        A_T_N_inv_d  = numpy.dot(template, N_inv_d) # numerator in eq (1)
+        A_LLS[i]     = A_T_N_inv_d/A_T_N_inv_A      # this is the value of m at points in the data window, from eq (1)
+        S2Nratio[i]  = A_T_N_inv_d/sqrt_A_T_N_inv_A  # signal-to-noise ratio 
+
+    #plt.clf()
+    #plt.plot(x, data)
+    #plt.title("Raw Data")
+    #plt.show()
+
+    #plt.clf()
+    #plt.plot(x, A_LLS)
+    #plt.title("LLS fitted amplitudes to raw data")
+    #plt.show()
+
+    #print("The amplitude of trial " + str(k) + " is " + str(numpy.max(A_LLS)))
+    
+    amps[k] = numpy.max(A_LLS)
+    errs[k] = 1/numpy.std(data)**2
+    
+    k += 1
+    
+numerator = 0; 
+denominator = 0; 
+    
+for t in range(k_max):
+    numerator += errs[t]*amps[t]
+    denominator += amps[t]
+    
+weighted_average = numerator/denominator 
+
+print("Weighted average of amplitudes: " + str(weighted_average))
+    
+print("The average amplitude of " + str(k_max) + " trials is " + str(numpy.mean(amps)) + ".")
+print("The standard deviation of the " + str(k_max) + " trials is " + str(numpy.std(amps))+".")
+
+
+# After running the program 100 times to produce 100 different data sets with the same injected Gaussian signal and random Gaussian noise at each data point, we can see that the average fitted amplitude is biased low because the noise plus the template Gaussian would give an amplitude of 2.0 + 0.5 = 2.5. 
